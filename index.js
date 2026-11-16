@@ -2,8 +2,22 @@ const express = require('express');
 const axios = require('axios');
 const Anthropic = require('@anthropic-ai/sdk');
 
+const pedidos = require('./pedidos');
+
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
+
+// Central de Pedidos: qual loja é cada conexão da Z-API, ex. {"3F0F72AF...":"Mogi"}
+let INSTANCIAS_LOJAS = {};
+try { INSTANCIAS_LOJAS = JSON.parse(process.env.INSTANCIAS_LOJAS || '{}'); } catch (e) { console.error('INSTANCIAS_LOJAS inválido'); }
+// Resposta automática com IA: desligada por padrão; as lojas e a Central atendem
+const BOT_IA = process.env.BOT_IA === 'on';
+// Token para o painel e o Claude lerem/atualizarem a lista de pedidos
+const CENTRAL_TOKEN = process.env.CENTRAL_TOKEN || '';
+function autorizado(req, res, next) {
+  if (!CENTRAL_TOKEN || req.get('x-api-key') !== CENTRAL_TOKEN) return res.status(401).json({ erro: 'não autorizado' });
+  next();
+}
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -175,8 +189,27 @@ app.post('/webhook', async (req, res) => {
 
   const body = req.body;
 
-  // Ignora mensagens enviadas pelo próprio bot
-  if (body.fromMe) return;
+  // Ignora mensagens enviadas pela própria loja e de grupos
+  if (body.fromMe || body.isGroup) return;
+
+  // Central de Pedidos: guarda pedidos/orçamentos do cardápio e comprovantes
+  try {
+    const p = pedidos.registrarMensagem({
+      loja_instancia: INSTANCIAS_LOJAS[body.instanceId] || '',
+      telefone: body.phone,
+      nome_whats: body.senderName || body.chatName || '',
+      texto: body.text?.message || '',
+      imagem: body.image ? { url: body.image.imageUrl, legenda: body.image.caption } : null,
+      quando: body.momment,
+    });
+    if (p) console.log(`Central: ${p.id} (${p.situacao}) · ${p.loja}`);
+    if (p && body.text?.message) return; // mensagem do cardápio não vai para a IA
+  } catch (err) {
+    console.error('Central: erro ao registrar', err.message);
+  }
+
+  // Resposta automática com IA só quando BOT_IA=on
+  if (!BOT_IA) return;
 
   // Só processa texto
   if (!body.text?.message) return;
@@ -224,6 +257,18 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
+// Central de Pedidos: lista e atualização (painel e Claude)
+app.get('/pedidos', autorizado, (req, res) => {
+  res.json(pedidos.listar({ loja: req.query.loja, situacao: req.query.situacao, desde: req.query.desde }));
+});
+app.patch('/pedidos/:id', autorizado, (req, res) => {
+  try {
+    const p = pedidos.atualizar(req.params.id, req.body || {});
+    if (!p) return res.status(404).json({ erro: 'pedido não encontrado' });
+    res.json(p);
+  } catch (e) { res.status(400).json({ erro: e.message }); }
+});
+
 app.get('/', (req, res) => res.send('Fada Farinha Bot ativo! 🧚'));
 
-app.listen(3000, () => console.log('Servidor da Fada rodando na porta 3000 🧁'));
+app.listen(process.env.PORT || 3000, () => console.log(`Servidor da Fada rodando na porta ${process.env.PORT || 3000} 🧁`));
