@@ -6,7 +6,7 @@ numa lista única, os pedidos e orçamentos enviados pelo cardápio digital.
 ## O que faz
 - `POST /webhook`: recebe as mensagens da Z-API. Mensagens do cardápio ("✅ PEDIDO CONFIRMADO" / "🟡 SÓ ORÇAMENTO")
   viram um registro com loja, cliente, itens, data, valor e situação. Imagem de um cliente com pedido aberto é
-  guardada como provável comprovante do Pix (`comprovante_a_conferir: true`).
+  guardada como anexo; só na Mogi (única loja que pede sinal via Pix) ela fica marcada como comprovante a conferir (`comprovante_a_conferir: true`).
 - `GET /pedidos?loja=&situacao=&desde=`: lista os pedidos (cabeçalho `x-api-key: CENTRAL_TOKEN`).
 - `PATCH /pedidos/:id`: atualiza `situacao`, `comanda`, `sinal_conferido`, `comprovante_a_conferir`,
   `observacao_loja`, `impresso_vias` (mesmo cabeçalho).

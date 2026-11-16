@@ -58,4 +58,7 @@ assert.equal(P.listar({loja:'Mooca'}).length,1); assert.equal(P.listar({situacao
 const u = P.atualizar('FF-MOGI-261116-CINTHIA-CMT',{situacao:'comanda_criada', comanda:'CINTHIA 5432-15/12 11HS'});
 assert.equal(u.situacao,'comanda_criada');
 assert.throws(()=>P.atualizar('FF-MOGI-261116-CINTHIA-CMT',{situacao:'xyz'}));
+// Mooca não cobra sinal: imagem vira anexo, mas não comprovante
+const m = P.registrarMensagem({ loja_instancia:'Mooca', telefone:'5511994838998', texto:'', imagem:{url:'https://x/foto.jpg'} });
+assert.equal(m.id,'FF-MOOCA-261116-GLAUCIA-2W4'); assert.equal(m.anexos.length,1); assert.notEqual(m.comprovante_a_conferir,true);
 console.log('ok: todos os testes passaram');

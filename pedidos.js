@@ -27,6 +27,9 @@ const reais = (s) => {
   return m ? parseFloat(m[1].replace(/\./g, '').replace(',', '.')) : null;
 };
 
+// A Mogi é a única loja que pede sinal de 50% via Pix
+const ehMogi = (p) => /mogi/i.test(`${p.loja || ''} ${p.loja_instancia || ''}`);
+
 // Reconhece uma mensagem do cardápio. Devolve null se não for uma.
 function lerMensagemCardapio(texto) {
   const t = String(texto || '');
@@ -92,7 +95,8 @@ function registrarMensagem({ loja_instancia, telefone, nome_whats, texto, imagem
     return p;
   }
 
-  // Imagem de um cliente com pedido aberto: provável comprovante do Pix
+  // Imagem de um cliente com pedido aberto: guarda como anexo (foto de inspiração ou comprovante).
+  // Só a Mogi cobra sinal via Pix, então só lá a imagem fica marcada como comprovante a conferir.
   if (imagem) {
     const aberto = lista
       .filter((x) => x.telefone_whats === telefone && ['orcamento', 'pedido'].includes(x.situacao))
@@ -100,7 +104,7 @@ function registrarMensagem({ loja_instancia, telefone, nome_whats, texto, imagem
     if (aberto) {
       aberto.anexos = aberto.anexos || [];
       aberto.anexos.push({ em: agora, url: imagem.url, legenda: imagem.legenda || '' });
-      aberto.comprovante_a_conferir = true;
+      if (ehMogi(aberto)) aberto.comprovante_a_conferir = true;
       aberto.atualizado_em = agora;
       aberto.historico.push({ em: agora, evento: 'imagem_recebida' });
       salvar(lista);
